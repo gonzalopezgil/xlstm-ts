@@ -5,11 +5,17 @@
 **Authors:** Gonzalo López Gil, Paul Duhamel-Sebline, Andrew McCarren  
 *Published in: [An Evaluation of Deep Learning Models for Stock Market Trend Prediction](https://arxiv.org/abs/2408.12408)*
 
-This repository contains the implementation of the **xLSTM-TS model**, a time series-optimised adaptation of the Extended Long Short-Term Memory (xLSTM) architecture proposed by Beck et al. (2024). The xLSTM-TS model modifies the xLSTM framework to make it suitable for time series forecasting. The architecture includes the xLSTM-TS implementation and integrates wavelet denoising techniques to enhance forecasting accuracy. While designed for versatility in time series forecasting, the model has been applied to short-term Stock Market Trend Prediction, demonstrating its effectiveness in financial applications as a key use case.
+This repository contains the implementation of the **xLSTM-TS model**, a time series-optimised adaptation of the Extended Long Short-Term Memory (xLSTM) architecture proposed by Beck et al. (2024). The xLSTM-TS model modifies the xLSTM framework to make it suitable for time series forecasting. The architecture includes the xLSTM-TS implementation and leakage-safe preprocessing utilities, including causal wavelet denoising. While designed for versatility in time series forecasting, the model has been applied to short-term Stock Market Trend Prediction as a key use case.
 
 In addition to xLSTM-TS, this repository features implementations of several state-of-the-art forecasting models for benchmarking purposes, such as TCN, N-BEATS, TFT, N-HiTS, and TiDE. These models have been evaluated alongside xLSTM-TS in our study. This repository provides datasets and code for the complete workflow, from preprocessing, to model training, and evaluation, along with detailed comparisons of accuracy and trend prediction capabilities.
 
 This is the **official repository** for the paper *"An Evaluation of Deep Learning Models for Stock Market Trend Prediction."*
+
+## Important correction: denoising leakage
+
+[Issue #2](https://github.com/gonzalopezgil/xlstm-ts/issues/2) correctly identified that the original denoised stock-prediction workflow applied wavelet denoising as a full-series offline transform before chronological evaluation. That allowed future observations to influence historical denoised values. The previously reported denoised metrics, cached notebook outputs, and generated prediction CSVs should therefore be treated as offline smoothing results, not valid live forecasting performance.
+
+The source code now makes `wavelet_denoising()` causal by default: the value produced at time `t` is computed only from observations up to and including `t`. The legacy full-series transform is still available as `offline_wavelet_denoising()` for visual/offline analysis, but it emits a warning and should not be used for forecasting features or targets.
 
 ```bibtex
 @misc{gil2024evaluationdeeplearningmodels,
@@ -39,7 +45,7 @@ This is the **official repository** for the paper *"An Evaluation of Deep Learni
 ## ✨ Key Features
 
 - **xLSTM-TS Implementation**: An adaptation of the Extended LSTM architecture for time series applications.
-- **Wavelet Denoising**: Noise reduction using discrete wavelet transforms (DWT) for enhanced signal clarity.
+- **Causal Wavelet Denoising**: Leakage-safe discrete wavelet denoising for forecasting features. The legacy full-series smoother is explicit and warned.
 - **Benchmark Models**: Includes leading deep learning architectures for comparison, such as TCN, N-BEATS, TFT, N-HiTS and TiDE.
 - **Comprehensive Evaluation**: Includes metrics such as Accuracy, F1 Score, MAE, RMSE, RMSSE, and MASE.
 - **Interactive Notebooks**: Experiment with pre-defined setups or customise parameters to explore your own datasets.
@@ -51,7 +57,7 @@ The stock market is a fundamental component of financial systems, reflecting eco
 
 This study investigates the efficacy of advanced deep learning models for short-term trend forecasting using daily and hourly closing prices from the S&P 500 index and the Brazilian ETF EWZ. The models explored include Temporal Convolutional Networks (TCN), Neural Basis Expansion Analysis for Time Series Forecasting (N-BEATS), Temporal Fusion Transformers (TFT), Neural Hierarchical Interpolation for Time Series Forecasting (N-HiTS), and Time-series Dense Encoder (TiDE). Furthermore, we introduce the Extended Long Short-Term Memory for Time Series (xLSTM-TS) model, an xLSTM adaptation optimised for time series prediction.
 
-Wavelet denoising techniques were applied to smooth the signal and reduce minor fluctuations, providing cleaner data as input for all approaches. Denoising significantly improved performance in predicting stock price direction. Among the models tested, xLSTM-TS consistently outperformed others. For example, it achieved a test accuracy of 72.82% and an F1 score of 73.16% on the EWZ daily dataset.
+The original experiments applied wavelet denoising to smooth the signal and reduce minor fluctuations. Those denoised results are now deprecated for live forecasting because the preprocessing was not causal. The xLSTM-TS implementation remains available, and denoising-based experiments should be rerun with the corrected causal transform and train-only scaling workflow before reporting forecasting performance.
 
 By leveraging advanced deep learning models and effective data preprocessing techniques, this research provides valuable insights into the application of machine learning for market movement forecasting, highlighting both the potential and the challenges involved.
 
@@ -180,7 +186,16 @@ The data fields include Date, High, Low, Close, Adjusted Close, and Volume, with
 
 ### 🌀 Noise Reduction
 
-To improve model accuracy, we used **wavelet denoising** to remove noise from the time series data. This approach, based on the discrete wavelet transform (DWT), effectively reduced minor fluctuations, providing a clearer signal for model training.
+For forecasting experiments, use **causal wavelet denoising** so each denoised value is computed only from data available at that timestamp:
+
+```python
+from ml.data.preprocessing import wavelet_denoising
+
+df["Close_denoised"] = wavelet_denoising(df["Close"].values)
+df["Noise"] = df["Close"] - df["Close_denoised"]
+```
+
+For offline visualization only, the old full-series smoother is available as `offline_wavelet_denoising()`. Do not use it for forecasting features, targets, validation metrics, or test metrics.
 
 ### 📐 Data Splitting
 
@@ -188,6 +203,41 @@ Each dataset was divided into training, validation, and test sets to enable robu
 
 - **Daily Data**: Training (86%), Validation (7%), Test (7%)
 - **Hourly Data**: Training (75%), Validation (12.5%), Test (12.5%)
+
+For xLSTM-TS, split sequences chronologically before fitting the scaler:
+
+```python
+from ml.models.xlstm_ts.preprocessing import (
+    create_feature_target_sequences,
+    normalise_feature_target_split_data_xlstm,
+    split_train_val_test_xlstm,
+)
+
+X, y, dates = create_feature_target_sequences(
+    df["Close"].values.reshape(-1, 1),
+    df["Close"].values.reshape(-1, 1),
+    df.index,
+)
+train_X, train_y, train_dates, val_X, val_y, val_dates, test_X, test_y, test_dates = split_train_val_test_xlstm(
+    X,
+    y,
+    dates,
+    TRAIN_END_DATE,
+    VAL_END_DATE,
+)
+train_X, train_y, val_X, val_y, test_X, test_y, feature_scaler, target_scaler = normalise_feature_target_split_data_xlstm(
+    train_X,
+    train_y,
+    val_X,
+    val_y,
+    test_X,
+    test_y,
+)
+```
+
+For causal-denoised xLSTM experiments, use `Close_denoised` as the feature sequence and raw `Close` as the target sequence.
+
+`normalise_data_xlstm()` is retained for small/manual workflows, but it must only be fitted on training data.
 
 ## 🧠 Models
 
@@ -204,17 +254,17 @@ The focus of this repository is the xLSTM-TS model, an adaptation of the **Exten
 
 ### 📊 Performance Metrics
 
-The models were evaluated using several metrics, including Accuracy, F1 Score, MAE, RMSE, RMSSE, and MASE. The xLSTM-TS model consistently outperformed other models, demonstrating robust predictive power across both daily and hourly datasets. Below are some highlights:
+The models were evaluated using several metrics, including Accuracy, F1 Score, MAE, RMSE, RMSSE, and MASE. The previously reported denoised stock-direction metrics are deprecated because they used offline denoising and should not be cited as live forecasting results. Corrected result tables should distinguish:
 
-- **EWZ Daily**: xLSTM-TS achieved a Test Accuracy of 72.87% and an F1 Score of 73.16%.
-- **S&P 500 Daily**: xLSTM-TS achieved a Test Accuracy of 71.28% and an F1 Score of 73.00%.
-
-These results show that xLSTM-TS is especially effective in capturing stock market trends when paired with wavelet-based denoising.
+- raw input with raw target;
+- causal features with raw target;
+- offline-denoised analysis, explicitly labelled as non-causal;
+- naive baselines such as majority class and previous-return direction.
 
 ### 🗝️ Key Findings
 
-- **Wavelet Denoising**: This preprocessing technique greatly enhanced prediction accuracy by providing a clearer input signal.
-- **Model Performance**: xLSTM-TS showed superior performance across datasets, especially when compared with other state-of-the-art models.
+- **Wavelet Denoising**: Full-series denoising is useful for offline signal analysis but invalid for live forecasting. Forecasting experiments must use causal denoising or raw data.
+- **Model Performance**: xLSTM-TS remains the main architectural contribution. Performance claims should be based on leakage-safe reruns.
 - **Timeframe Sensitivity**: Predictions of daily trends generally achieved higher accuracy than hourly trends, likely due to the higher volatility in shorter time frames.
 
 ## 🤝 Contributions

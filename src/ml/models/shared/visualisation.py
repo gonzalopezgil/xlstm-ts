@@ -16,8 +16,8 @@ def visualise(actual, prediction, stock, model_name, data_type, show_complete=Tr
     title = f"{model_name} Predictions (Trained with "
     if data_type == "Original":
         title += "Original Data)"
-    elif data_type == "Denoised":
-        title += "Denoised Data)"
+    elif data_type in {"Denoised", "Causal Denoised", "Causal Denoised Features"}:
+        title += "Causal Denoised Data)"
     else:
         title = f"{model_name} Predictions"
 

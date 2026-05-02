@@ -65,7 +65,7 @@ def apply_torch_include_paths_compat():
         return
 
     def include_paths_compat(*args, cuda=False, **kwargs):
-        if "device_type" in signature.parameters and "device_type" not in kwargs:
+        if "device_type" in signature.parameters and not args and "device_type" not in kwargs:
             kwargs["device_type"] = "cuda" if cuda else "cpu"
         return original_include_paths(*args, **kwargs)
 

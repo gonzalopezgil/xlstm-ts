@@ -10,6 +10,8 @@
 # - Parameters for time series: https://github.com/smvorwerk/xlstm-cuda
 # -------------------------------------------------------------------------------------------
 
+import os
+import torch
 import torch.nn as nn
 from xlstm import (
     xLSTMBlockStack,
@@ -27,6 +29,19 @@ from torchinfo import summary
 # Configuration
 # -------------------------------------------------------------------------------------------
 
+def select_slstm_backend():
+    requested_backend = os.environ.get("XLSTM_SLSTM_BACKEND")
+    if requested_backend:
+        return requested_backend
+
+    if torch.cuda.is_available():
+        major, _ = torch.cuda.get_device_capability()
+        if major < 8:
+            return "vanilla"
+
+    return "cuda"
+
+
 def create_xlstm_model(seq_length):
     # Define your input size, hidden size, and other relevant parameters
     input_size = 1  # Number of features in your time series
@@ -42,7 +57,7 @@ def create_xlstm_model(seq_length):
         ),
         slstm_block=sLSTMBlockConfig(
             slstm=sLSTMLayerConfig(
-                backend="cuda",
+                backend=select_slstm_backend(),
                 num_heads=2,  # Reduced number of heads to save memory
                 conv1d_kernel_size=2,  # Reduced kernel size to save memory
                 bias_init="powerlaw_blockdependent",

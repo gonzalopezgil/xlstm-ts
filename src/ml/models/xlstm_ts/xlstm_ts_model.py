@@ -29,6 +29,19 @@ from torchinfo import summary
 # Configuration
 # -------------------------------------------------------------------------------------------
 
+def select_device():
+    requested_device = os.environ.get("XLSTM_TS_DEVICE")
+    if requested_device:
+        return torch.device(requested_device)
+
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return torch.device("mps")
+
+    return torch.device("cpu")
+
 def select_slstm_backend():
     requested_backend = os.environ.get("XLSTM_SLSTM_BACKEND")
     if requested_backend:
@@ -39,7 +52,9 @@ def select_slstm_backend():
         if major < 8:
             return "vanilla"
 
-    return "cuda"
+        return "cuda"
+
+    return "vanilla"
 
 
 def create_xlstm_model(seq_length):
@@ -70,14 +85,16 @@ def create_xlstm_model(seq_length):
         slstm_at=[1],
     )
 
+    device = select_device()
+
     # Instantiate the xLSTM stack
-    xlstm_stack = xLSTMBlockStack(cfg).to("cuda")
+    xlstm_stack = xLSTMBlockStack(cfg).to(device)
 
     # Add a linear layer to project input data to the required embedding dimension
-    input_projection = nn.Linear(input_size, embedding_dim).to("cuda")
+    input_projection = nn.Linear(input_size, embedding_dim).to(device)
 
     # Add a final linear layer to project the xLSTM output to the desired output size
-    output_projection = nn.Linear(embedding_dim, output_size).to("cuda")
+    output_projection = nn.Linear(embedding_dim, output_size).to(device)
 
     return xlstm_stack, input_projection, output_projection
 
@@ -102,7 +119,7 @@ class ModelWrapper(nn.Module):
 def plot_architecture_xlstm():
     xlstm_stack, input_projection, output_projection = create_xlstm_model(SEQ_LENGTH_XLSTM)
 
-    model = ModelWrapper(input_projection, xlstm_stack, output_projection).cuda()
+    model = ModelWrapper(input_projection, xlstm_stack, output_projection).to(select_device())
 
     batch_size = 16
     real_input_dimensions = (batch_size, SEQ_LENGTH_XLSTM, 1)

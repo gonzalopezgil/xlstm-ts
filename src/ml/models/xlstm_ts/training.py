@@ -108,15 +108,21 @@ def train_model(xlstm_stack, input_projection, output_projection, train_x, train
 # Evaluation
 # -------------------------------------------------------------------------------------------
 
-def evaluate_model(xlstm_stack, input_projection, output_projection, test_x):
+def evaluate_model(xlstm_stack, input_projection, output_projection, test_x, batch_size=None):
     # Load the best model
-    xlstm_stack.load_state_dict(torch.load('xlstm_ts_model.pth'))
+    xlstm_stack.load_state_dict(torch.load('xlstm_ts_model.pth', map_location=test_x.device))
+
+    if batch_size is None:
+        batch_size = int(os.environ.get("XLSTM_TS_BATCH_SIZE", "16"))
 
     # Evaluate the model on the test set
     xlstm_stack.eval()  # Set the model to evaluation mode
+    predictions = []
     with torch.no_grad():
-        projected_input_data = input_projection(test_x)
-        xlstm_output = xlstm_stack(projected_input_data)
-        test_predictions = output_projection(xlstm_output[:, -1, :])  # Use the last time step's output
+        for start in range(0, len(test_x), batch_size):
+            batch_x = test_x[start:start + batch_size]
+            projected_input_data = input_projection(batch_x)
+            xlstm_output = xlstm_stack(projected_input_data)
+            predictions.append(output_projection(xlstm_output[:, -1, :]))  # Use the last time step's output
 
-    return test_predictions
+    return torch.cat(predictions, dim=0)

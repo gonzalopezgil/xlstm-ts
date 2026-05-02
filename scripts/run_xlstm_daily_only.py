@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run only the daily S&P 500 xLSTM-TS leakage-safe comparison."""
+"""Run one xLSTM-TS leakage-safe raw-vs-causal-denoised comparison."""
 
 import argparse
 import builtins
@@ -35,6 +35,7 @@ def parse_args():
     parser.add_argument("--epochs", type=int)
     parser.add_argument("--patience", type=int)
     parser.add_argument("--batch-size", type=int)
+    parser.add_argument("--device", choices=["auto", "cuda", "mps", "cpu"], default="auto")
     return parser.parse_args()
 
 
@@ -56,6 +57,16 @@ def set_seed(seed):
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def resolve_device(requested):
+    if requested != "auto":
+        return requested
+    if torch.cuda.is_available():
+        return "cuda"
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
 
 
 def apply_torch_include_paths_compat():
@@ -122,9 +133,12 @@ def main():
         os.environ["XLSTM_TS_PATIENCE"] = str(args.patience)
     if args.batch_size is not None:
         os.environ["XLSTM_TS_BATCH_SIZE"] = str(args.batch_size)
+    device = resolve_device(args.device)
+    os.environ["XLSTM_TS_DEVICE"] = device
+    if device != "cuda":
+        os.environ.setdefault("XLSTM_SLSTM_BACKEND", "vanilla")
 
-    if not torch.cuda.is_available():
-        raise RuntimeError("xLSTM-TS currently requires CUDA. Run this script on a Colab T4 runtime.")
+    print(f"Using xLSTM-TS device: {device}", flush=True)
 
     plt.show = lambda *_, **__: None
     quiet_epoch_prints()
@@ -263,23 +277,32 @@ def main():
         "Precision (Fall)",
         "F1 Score",
     ]
-    result_text = "\nXLSTM_ONLY_DAILY_RESULTS\n" + summary[cols].round(2).to_string()
+    result_key = f"XLSTM_ONLY_{args.file_name.upper()}_RESULTS"
+    result_text = f"\n{result_key}\n" + summary[cols].round(2).to_string()
     result_csv = summary[cols].to_csv()
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "xlstm_only_daily_results.csv").write_text(result_csv)
-    (output_dir / "xlstm_only_daily_results.txt").write_text(
-        result_text + "\n\nXLSTM_ONLY_DAILY_RESULTS_CSV\n" + result_csv
+    (output_dir / f"xlstm_only_{args.file_name}_results.csv").write_text(result_csv)
+    (output_dir / f"xlstm_only_{args.file_name}_results.txt").write_text(
+        result_text + f"\n\n{result_key}_CSV\n" + result_csv
     )
 
     print(result_text)
-    print("\nXLSTM_ONLY_DAILY_RESULTS_CSV")
+    print(f"\n{result_key}_CSV")
     print(result_csv)
-    print(
-        "\nOld cached daily xLSTM references: raw Test Accuracy 49.47%, "
-        "leaky offline-denoised Test Accuracy 66.22%."
-    )
+    old_references = {
+        "sp500_daily": (
+            "Old cached daily xLSTM references: raw Test Accuracy 49.47%, "
+            "leaky offline-denoised Test Accuracy 66.22%."
+        ),
+        "sp500_hourly": (
+            "Old cached hourly xLSTM references: raw Test Accuracy 50.11%, "
+            "leaky offline-denoised Test Accuracy 68.05%."
+        ),
+    }
+    if args.file_name in old_references:
+        print("\n" + old_references[args.file_name])
 
 
 if __name__ == "__main__":

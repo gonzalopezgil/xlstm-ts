@@ -153,7 +153,11 @@ def create_feature_target_sequences(features, target, dates):
 # -------------------------------------------------------------------------------------------
 
 def _default_device():
-    return 'cuda' if torch.cuda.is_available() else 'cpu'
+    if torch.cuda.is_available():
+        return 'cuda'
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return 'mps'
+    return 'cpu'
 
 def _move_to_device(data, device):
     if hasattr(data, "to"):

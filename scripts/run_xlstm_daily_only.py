@@ -87,6 +87,11 @@ def ensure_xlstm_runtime_dependencies():
         missing_packages.append("torchinfo==1.8.0")
 
     try:
+        import ninja  # noqa: F401
+    except ModuleNotFoundError:
+        missing_packages.append("ninja==1.11.1.1")
+
+    try:
         import pywt  # noqa: F401
     except ModuleNotFoundError:
         missing_packages.append("PyWavelets==1.6.0")

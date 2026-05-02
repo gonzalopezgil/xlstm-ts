@@ -1,8 +1,7 @@
 # src/ml/models/shared/metrics.py
 
-from sklearn.metrics import mean_absolute_error, mean_squared_error, root_mean_squared_error, mean_absolute_percentage_error, r2_score
-from darts import TimeSeries
 import numpy as np
+from sklearn.metrics import mean_absolute_error, mean_squared_error, root_mean_squared_error, mean_absolute_percentage_error, r2_score
 
 # -------------------------------------------------------------------------------------------
 # Forecasting metrics
@@ -23,11 +22,19 @@ def mean_absolute_scaled_error(actual: np.ndarray, predicted: np.ndarray, season
     # MASE - Mean Absolute Scaled Error
     return mean_absolute_error(actual, predicted) / mean_absolute_error(actual[seasonality:], _naive_forecasting(actual, seasonality))
 
+def _is_darts_timeseries(value):
+    try:
+        from darts import TimeSeries
+    except ModuleNotFoundError:
+        return False
+
+    return isinstance(value, TimeSeries)
+
 def calculate_metrics(actual, prediction, model_name, data_type):
     # Convert Darts TimeSeries to NumPy arrays if necessary
-    if isinstance(actual, TimeSeries):
+    if _is_darts_timeseries(actual):
         actual = actual.values().flatten()
-    if isinstance(prediction, TimeSeries):
+    if _is_darts_timeseries(prediction):
         prediction = prediction.values().flatten()
 
     # Calculate metrics using scikit-learn functions

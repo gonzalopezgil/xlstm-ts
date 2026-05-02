@@ -6,6 +6,7 @@ import builtins
 import datetime as dt
 import os
 import random
+import subprocess
 import sys
 from pathlib import Path
 
@@ -53,12 +54,40 @@ def set_seed(seed):
         torch.cuda.manual_seed_all(seed)
 
 
+def ensure_xlstm_runtime_dependencies():
+    missing_packages = []
+
+    try:
+        import xlstm  # noqa: F401
+    except ModuleNotFoundError:
+        missing_packages.append("xlstm==1.0.3")
+
+    try:
+        import torchinfo  # noqa: F401
+    except ModuleNotFoundError:
+        missing_packages.append("torchinfo==1.8.0")
+
+    try:
+        import pywt  # noqa: F401
+    except ModuleNotFoundError:
+        missing_packages.append("PyWavelets==1.6.0")
+
+    if missing_packages:
+        print(
+            "Installing missing xLSTM runtime dependencies: "
+            + ", ".join(missing_packages),
+            flush=True,
+        )
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", *missing_packages])
+
+
 def main():
     args = parse_args()
 
     os.chdir(REPO_ROOT)
     if str(SRC_PATH) not in sys.path:
         sys.path.insert(0, str(SRC_PATH))
+    ensure_xlstm_runtime_dependencies()
 
     if not torch.cuda.is_available():
         raise RuntimeError("xLSTM-TS currently requires CUDA. Run this script on a Colab T4 runtime.")

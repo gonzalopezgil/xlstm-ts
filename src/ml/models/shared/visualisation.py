@@ -1,16 +1,23 @@
 # src/ml/models/shared/visualisation.py
 
-from darts import TimeSeries
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 
+def _is_darts_timeseries(value):
+    try:
+        from darts import TimeSeries
+    except ModuleNotFoundError:
+        return False
+
+    return isinstance(value, TimeSeries)
+
 def visualise(actual, prediction, stock, model_name, data_type, show_complete=True, dates=None):
-    if isinstance(actual, TimeSeries):
+    if _is_darts_timeseries(actual):
         dates = actual.time_index
         actual = actual.values().flatten()
-    if isinstance(prediction, TimeSeries):
+    if _is_darts_timeseries(prediction):
         prediction = prediction.values().flatten()
 
     title = f"{model_name} Predictions (Trained with "

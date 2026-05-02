@@ -1,12 +1,22 @@
+import csv
 import json
 import unittest
 from pathlib import Path
 
 
-NOTEBOOKS = [
-    Path("notebooks/sp500_daily.ipynb"),
-    Path("notebooks/sp500_hourly.ipynb"),
-]
+NOTEBOOKS = {
+    Path("notebooks/sp500_daily.ipynb"): Path("data/results/xlstm_daily_leakage_safe_results.csv"),
+    Path("notebooks/sp500_hourly.ipynb"): Path("data/results/xlstm_hourly_leakage_safe_results.csv"),
+}
+
+RENDERED_RESULTS_TAG = "xlstm_ts_rendered_results"
+
+DISPLAY_LABELS = {
+    "current_raw_xlstm_ts": "Current raw xLSTM-TS",
+    "current_causal_denoised_feature_xlstm_ts": "Current causal-denoised-feature xLSTM-TS",
+    "old_cached_raw_xlstm_ts": "Old cached raw xLSTM-TS",
+    "old_cached_offline_denoised_xlstm_ts": "Old cached offline-denoised xLSTM-TS",
+}
 
 
 def notebook_source(path):
@@ -16,6 +26,33 @@ def notebook_source(path):
         for cell in notebook["cells"]
         if cell.get("cell_type") == "code"
     )
+
+
+def notebook_text(path):
+    notebook = json.loads(path.read_text())
+    return json.dumps(notebook, sort_keys=True)
+
+
+def read_result_rows(path):
+    with path.open(newline="") as file_obj:
+        return list(csv.DictReader(file_obj))
+
+
+def rendered_result_cells(notebook):
+    return [
+        cell
+        for cell in notebook["cells"]
+        if cell.get("cell_type") == "code"
+        and cell.get("metadata", {}).get(RENDERED_RESULTS_TAG)
+    ]
+
+
+def pct(value):
+    return f"{float(value):.2f}%"
+
+
+def metric(value):
+    return f"{float(value):.2f}"
 
 
 class NotebookPreprocessingTest(unittest.TestCase):
@@ -31,8 +68,37 @@ class NotebookPreprocessingTest(unittest.TestCase):
                     elif cell.get("cell_type") == "code":
                         self.assertIn("outputs", cell, msg=f"code cell {index}")
                         self.assertIn("execution_count", cell, msg=f"code cell {index}")
-                        self.assertEqual([], cell["outputs"], msg=f"code cell {index}")
-                        self.assertIsNone(cell["execution_count"], msg=f"code cell {index}")
+                        if cell.get("metadata", {}).get(RENDERED_RESULTS_TAG):
+                            self.assertIsNotNone(cell["execution_count"], msg=f"code cell {index}")
+                            self.assertGreater(len(cell["outputs"]), 0, msg=f"code cell {index}")
+                        else:
+                            self.assertEqual([], cell["outputs"], msg=f"code cell {index}")
+                            self.assertIsNone(cell["execution_count"], msg=f"code cell {index}")
+
+    def test_rendered_result_tables_match_committed_csvs(self):
+        for notebook_path, result_path in NOTEBOOKS.items():
+            with self.subTest(path=str(notebook_path)):
+                notebook = json.loads(notebook_path.read_text())
+                rendered_cells = rendered_result_cells(notebook)
+                self.assertEqual(1, len(rendered_cells))
+
+                rendered_cell = rendered_cells[0]
+                rendered_text = notebook_text(notebook_path)
+                outputs = rendered_cell["outputs"]
+                self.assertTrue(
+                    any("text/html" in output.get("data", {}) for output in outputs),
+                    msg="rendered result cell must include an HTML table output",
+                )
+
+                rows = read_result_rows(result_path)
+                self.assertEqual(4, len(rows))
+                for row in rows:
+                    label = DISPLAY_LABELS[row["pipeline"]]
+                    self.assertIn(label, rendered_text)
+                    self.assertIn(pct(row["test_accuracy"]), rendered_text)
+                    self.assertIn(pct(row["f1_score"]), rendered_text)
+                    self.assertIn(metric(row["mae"]), rendered_text)
+                    self.assertIn(metric(row["rmse"]), rendered_text)
 
     def test_xlstm_notebooks_split_before_scaling(self):
         for path in NOTEBOOKS:

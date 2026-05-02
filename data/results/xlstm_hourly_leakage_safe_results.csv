@@ -1,0 +1,5 @@
+pipeline,mae,rmse,rmsse,mape,r2,train_accuracy,validation_accuracy,test_accuracy,recall,precision_rise,precision_fall,f1_score,notes
+current_raw_xlstm_ts,15.255838,22.12162,16.005104,2.8586942702531815,0.02318251132965088,50.76683707490554,49.0372272143774,50.540216086434576,60.879629629629626,51.976284584980235,48.318042813455655,56.07675906183369,"Local MPS bounded rerun: scripts/run_xlstm_daily_only.py --file-name sp500_hourly --train-end-date 2023-07-01 --val-end-date 2024-01-01 --epochs 20 --patience 5 --batch-size 32"
+current_causal_denoised_feature_xlstm_ts,77.42013,86.8523,62.83808,14.810001850128174,-14.057130813598633,50.500111135807956,47.368421052631575,49.57983193277311,55.55555555555556,51.28205128205128,47.397260273972606,53.333333333333336,"Causal wavelet-denoised features with raw Close target; same bounded local MPS rerun"
+old_cached_raw_xlstm_ts,1.31,1.94,,,,,,50.11,,,,53.81,"Legacy cached reference from original hourly notebook outputs"
+old_cached_offline_denoised_xlstm_ts,2.49,3.34,,,,,,68.05,,,,70.13,"Deprecated: offline full-series denoising; not valid live forecasting"

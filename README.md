@@ -17,7 +17,9 @@ This is the **official repository** for the paper *"An Evaluation of Deep Learni
 
 The source code now makes `wavelet_denoising()` causal by default: the value produced at time `t` is computed only from observations up to and including `t`. The legacy full-series transform is still available as `offline_wavelet_denoising()` for visual/offline analysis, but it emits a warning and should not be used for forecasting features or targets.
 
-The daily S&P 500 xLSTM-TS rerun on this branch does **not** reproduce the old denoised gain. A bounded Colab T4 rerun (`scripts/run_xlstm_daily_only.py --epochs 20 --patience 5 --batch-size 32`) produced:
+The corrected bounded S&P 500 xLSTM-TS reruns on this branch do **not** reproduce the old denoised gain.
+
+Daily rerun, performed on Colab T4 with `scripts/run_xlstm_daily_only.py --epochs 20 --patience 5 --batch-size 32`:
 
 | Pipeline | Test Accuracy | F1 Score | MAE | RMSE |
 | --- | ---: | ---: | ---: | ---: |
@@ -26,7 +28,16 @@ The daily S&P 500 xLSTM-TS rerun on this branch does **not** reproduce the old d
 | Old cached offline-denoised xLSTM-TS | 66.22% | 68.33% | 55.84 | 67.83 |
 | Current causal-denoised-feature xLSTM-TS | 47.87% | 49.74% | 74.63 | 90.62 |
 
-The corrected result supports the architecture/preprocessing cleanup, but it retracts the original claim that wavelet denoising materially improves live stock-direction prediction.
+Hourly rerun, performed locally on MPS with `scripts/run_xlstm_daily_only.py --file-name sp500_hourly --train-end-date 2023-07-01 --val-end-date 2024-01-01 --epochs 20 --patience 5 --batch-size 32` after the Colab runtime disconnected before producing a CSV:
+
+| Pipeline | Test Accuracy | F1 Score | MAE | RMSE |
+| --- | ---: | ---: | ---: | ---: |
+| Old cached raw xLSTM-TS | 50.11% | 53.81% | 1.31 | 1.94 |
+| Current raw xLSTM-TS | 50.54% | 56.08% | 15.26 | 22.12 |
+| Old cached offline-denoised xLSTM-TS | 68.05% | 70.13% | 2.49 | 3.34 |
+| Current causal-denoised-feature xLSTM-TS | 49.58% | 53.33% | 77.42 | 86.85 |
+
+The corrected results support the architecture/preprocessing cleanup, but they retract the original claim that wavelet denoising materially improves live stock-direction prediction.
 
 ```bibtex
 @misc{gil2024evaluationdeeplearningmodels,
@@ -285,10 +296,30 @@ python -u scripts/run_xlstm_daily_only.py --epochs 20 --patience 5 --batch-size 
 | Current raw xLSTM-TS | 49.20% | 51.40% | 51.65 | 64.39 |
 | Current causal-denoised-feature xLSTM-TS | 47.87% | 49.74% | 74.63 | 90.62 |
 
+### Corrected hourly xLSTM-TS rerun
+
+The leakage-safe hourly S&P 500 xLSTM-TS rerun is stored in [`data/results/xlstm_hourly_leakage_safe_results.csv`](data/results/xlstm_hourly_leakage_safe_results.csv). It was run locally on MPS from branch `fix/leakage-safe-denoising` after the Colab runtime disconnected before producing a CSV:
+
+```bash
+python -u scripts/run_xlstm_daily_only.py \
+  --file-name sp500_hourly \
+  --train-end-date 2023-07-01 \
+  --val-end-date 2024-01-01 \
+  --epochs 20 \
+  --patience 5 \
+  --batch-size 32 \
+  --output-dir /tmp/xlstm-hourly-final
+```
+
+| Pipeline | Test Accuracy | F1 Score | MAE | RMSE |
+| --- | ---: | ---: | ---: | ---: |
+| Current raw xLSTM-TS | 50.54% | 56.08% | 15.26 | 22.12 |
+| Current causal-denoised-feature xLSTM-TS | 49.58% | 53.33% | 77.42 | 86.85 |
+
 ### 🗝️ Key Findings
 
 - **Wavelet Denoising**: Full-series denoising is useful for offline signal analysis but invalid for live forecasting. Forecasting experiments must use causal denoising or raw data.
-- **Model Performance**: xLSTM-TS remains the main architectural contribution. In the corrected daily xLSTM-TS rerun, causal denoising did not improve directional accuracy over the raw pipeline.
+- **Model Performance**: xLSTM-TS remains the main architectural contribution. In the corrected daily and hourly xLSTM-TS reruns, causal denoising did not improve directional accuracy over the raw pipeline.
 - **Timeframe Sensitivity**: Predictions of daily trends generally achieved higher accuracy than hourly trends, likely due to the higher volatility in shorter time frames.
 
 ## 🤝 Contributions

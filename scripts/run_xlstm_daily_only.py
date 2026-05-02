@@ -4,6 +4,7 @@
 import argparse
 import builtins
 import datetime as dt
+import inspect
 import os
 import random
 import subprocess
@@ -54,8 +55,26 @@ def set_seed(seed):
         torch.cuda.manual_seed_all(seed)
 
 
+def apply_torch_include_paths_compat():
+    """Keep xlstm==1.0.3 importable on Colab runtimes with newer PyTorch."""
+    import torch.utils.cpp_extension as cpp_extension
+
+    original_include_paths = cpp_extension.include_paths
+    signature = inspect.signature(original_include_paths)
+    if "cuda" in signature.parameters:
+        return
+
+    def include_paths_compat(*args, cuda=False, **kwargs):
+        if "device_type" in signature.parameters and "device_type" not in kwargs:
+            kwargs["device_type"] = "cuda" if cuda else "cpu"
+        return original_include_paths(*args, **kwargs)
+
+    cpp_extension.include_paths = include_paths_compat
+
+
 def ensure_xlstm_runtime_dependencies():
     missing_packages = []
+    apply_torch_include_paths_compat()
 
     try:
         import xlstm  # noqa: F401
@@ -79,6 +98,7 @@ def ensure_xlstm_runtime_dependencies():
             flush=True,
         )
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", *missing_packages])
+        apply_torch_include_paths_compat()
 
 
 def main():

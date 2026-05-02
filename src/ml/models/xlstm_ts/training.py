@@ -1,5 +1,6 @@
 # src/ml/models/xlstm_ts/xlstm_ts_model.py
 
+import os
 import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -22,11 +23,11 @@ def create_dataloader(x, y, batch_size, shuffle=True):
 def train_model(xlstm_stack, input_projection, output_projection, train_x, train_y, val_x, val_y):
     # Hyperparameters
     learning_rate = 0.0001
-    num_epochs = 200
-    batch_size = 16  # Reduced batch size to save memory
+    num_epochs = int(os.environ.get("XLSTM_TS_NUM_EPOCHS", "200"))
+    batch_size = int(os.environ.get("XLSTM_TS_BATCH_SIZE", "16"))  # Reduced batch size to save memory
 
     best_val_loss = float('inf')
-    patience = 40
+    patience = int(os.environ.get("XLSTM_TS_PATIENCE", "40"))
     trigger_times = 0
 
     # DataLoader for batching

@@ -32,6 +32,9 @@ def parse_args():
     parser.add_argument("--val-end-date", default="2022-07-01")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output-dir", default="/content")
+    parser.add_argument("--epochs", type=int)
+    parser.add_argument("--patience", type=int)
+    parser.add_argument("--batch-size", type=int)
     return parser.parse_args()
 
 
@@ -113,6 +116,12 @@ def main():
     if str(SRC_PATH) not in sys.path:
         sys.path.insert(0, str(SRC_PATH))
     ensure_xlstm_runtime_dependencies()
+    if args.epochs is not None:
+        os.environ["XLSTM_TS_NUM_EPOCHS"] = str(args.epochs)
+    if args.patience is not None:
+        os.environ["XLSTM_TS_PATIENCE"] = str(args.patience)
+    if args.batch_size is not None:
+        os.environ["XLSTM_TS_BATCH_SIZE"] = str(args.batch_size)
 
     if not torch.cuda.is_available():
         raise RuntimeError("xLSTM-TS currently requires CUDA. Run this script on a Colab T4 runtime.")

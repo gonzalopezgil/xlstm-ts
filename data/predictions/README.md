@@ -6,3 +6,5 @@ transform and should not be interpreted as valid live forecasting results.
 
 Regenerate predictions with the causal preprocessing pipeline before citing or
 comparing forecasting metrics.
+
+Corrected summary metrics are tracked separately under `data/results/`.

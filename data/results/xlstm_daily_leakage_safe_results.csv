@@ -1,0 +1,5 @@
+pipeline,mae,rmse,rmsse,mape,r2,train_accuracy,validation_accuracy,test_accuracy,recall,precision_rise,precision_fall,f1_score,notes
+current_raw_xlstm_ts,51.65309143066406,64.38845825195312,1.4861564555041273,1.2520193122327328,0.9444581270217896,47.8082992402104,49.333333333333336,49.202127659574465,53.1578947368421,49.75369458128079,48.554913294797686,51.399491094147585,"Colab T4 bounded rerun: scripts/run_xlstm_daily_only.py --epochs 20 --patience 5 --batch-size 32"
+current_causal_denoised_feature_xlstm_ts,74.62910461425781,90.61659240722656,2.091530452144435,1.8338477239012718,0.8899930715560913,47.98363530099357,47.46666666666667,47.87234042553192,51.05263157894737,48.5,47.159090909090914,49.743589743589745,"Causal wavelet-denoised features with raw Close target; same bounded Colab T4 rerun"
+old_cached_raw_xlstm_ts,38.25,48.22,,,,,,49.47,,,,51.78,"Legacy cached reference from original daily notebook outputs"
+old_cached_offline_denoised_xlstm_ts,55.84,67.83,,,,,,66.22,,,,68.33,"Deprecated: offline full-series denoising; not valid live forecasting"

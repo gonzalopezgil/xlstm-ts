@@ -17,6 +17,17 @@ This is the **official repository** for the paper *"An Evaluation of Deep Learni
 
 The source code now makes `wavelet_denoising()` causal by default: the value produced at time `t` is computed only from observations up to and including `t`. The legacy full-series transform is still available as `offline_wavelet_denoising()` for visual/offline analysis, but it emits a warning and should not be used for forecasting features or targets.
 
+The daily S&P 500 xLSTM-TS rerun on this branch does **not** reproduce the old denoised gain. A bounded Colab T4 rerun (`scripts/run_xlstm_daily_only.py --epochs 20 --patience 5 --batch-size 32`) produced:
+
+| Pipeline | Test Accuracy | F1 Score | MAE | RMSE |
+| --- | ---: | ---: | ---: | ---: |
+| Old cached raw xLSTM-TS | 49.47% | 51.78% | 38.25 | 48.22 |
+| Current raw xLSTM-TS | 49.20% | 51.40% | 51.65 | 64.39 |
+| Old cached offline-denoised xLSTM-TS | 66.22% | 68.33% | 55.84 | 67.83 |
+| Current causal-denoised-feature xLSTM-TS | 47.87% | 49.74% | 74.63 | 90.62 |
+
+The corrected result supports the architecture/preprocessing cleanup, but it retracts the original claim that wavelet denoising materially improves live stock-direction prediction.
+
 ```bibtex
 @misc{gil2024evaluationdeeplearningmodels,
       title={An Evaluation of Deep Learning Models for Stock Market Trend Prediction}, 
@@ -57,7 +68,7 @@ The stock market is a fundamental component of financial systems, reflecting eco
 
 This study investigates the efficacy of advanced deep learning models for short-term trend forecasting using daily and hourly closing prices from the S&P 500 index and the Brazilian ETF EWZ. The models explored include Temporal Convolutional Networks (TCN), Neural Basis Expansion Analysis for Time Series Forecasting (N-BEATS), Temporal Fusion Transformers (TFT), Neural Hierarchical Interpolation for Time Series Forecasting (N-HiTS), and Time-series Dense Encoder (TiDE). Furthermore, we introduce the Extended Long Short-Term Memory for Time Series (xLSTM-TS) model, an xLSTM adaptation optimised for time series prediction.
 
-The original experiments applied wavelet denoising to smooth the signal and reduce minor fluctuations. Those denoised results are now deprecated for live forecasting because the preprocessing was not causal. The xLSTM-TS implementation remains available, and denoising-based experiments should be rerun with the corrected causal transform and train-only scaling workflow before reporting forecasting performance.
+The original experiments applied wavelet denoising to smooth the signal and reduce minor fluctuations. Those denoised results are now deprecated for live forecasting because the preprocessing was not causal. The xLSTM-TS implementation remains available, but performance claims should be based on raw inputs or on reruns using the corrected causal transform and train-only scaling workflow.
 
 By leveraging advanced deep learning models and effective data preprocessing techniques, this research provides valuable insights into the application of machine learning for market movement forecasting, highlighting both the potential and the challenges involved.
 
@@ -235,7 +246,7 @@ train_X, train_y, val_X, val_y, test_X, test_y, feature_scaler, target_scaler = 
 )
 ```
 
-For causal-denoised xLSTM experiments, use `Close_denoised` as the feature sequence and raw `Close` as the target sequence.
+For causal-denoised xLSTM experiments, use `Close_denoised` as the feature sequence and raw `Close` as the target sequence. For Darts univariate models, the notebook trains on the causal-denoised series but evaluates predictions against the raw close series; this should be reported as causal-denoised input with raw-price evaluation, not as a denoised target benchmark.
 
 `normalise_data_xlstm()` is retained for small/manual workflows, but it must only be fitted on training data.
 
@@ -257,14 +268,27 @@ The focus of this repository is the xLSTM-TS model, an adaptation of the **Exten
 The models were evaluated using several metrics, including Accuracy, F1 Score, MAE, RMSE, RMSSE, and MASE. The previously reported denoised stock-direction metrics are deprecated because they used offline denoising and should not be cited as live forecasting results. Corrected result tables should distinguish:
 
 - raw input with raw target;
-- causal features with raw target;
+- causal-denoised input with raw-price evaluation;
 - offline-denoised analysis, explicitly labelled as non-causal;
 - naive baselines such as majority class and previous-return direction.
+
+### Corrected daily xLSTM-TS rerun
+
+The leakage-safe daily S&P 500 xLSTM-TS rerun is stored in [`data/results/xlstm_daily_leakage_safe_results.csv`](data/results/xlstm_daily_leakage_safe_results.csv). It was run on Google Colab T4 from branch `fix/leakage-safe-denoising` with:
+
+```bash
+python -u scripts/run_xlstm_daily_only.py --epochs 20 --patience 5 --batch-size 32 --output-dir /content
+```
+
+| Pipeline | Test Accuracy | F1 Score | MAE | RMSE |
+| --- | ---: | ---: | ---: | ---: |
+| Current raw xLSTM-TS | 49.20% | 51.40% | 51.65 | 64.39 |
+| Current causal-denoised-feature xLSTM-TS | 47.87% | 49.74% | 74.63 | 90.62 |
 
 ### 🗝️ Key Findings
 
 - **Wavelet Denoising**: Full-series denoising is useful for offline signal analysis but invalid for live forecasting. Forecasting experiments must use causal denoising or raw data.
-- **Model Performance**: xLSTM-TS remains the main architectural contribution. Performance claims should be based on leakage-safe reruns.
+- **Model Performance**: xLSTM-TS remains the main architectural contribution. In the corrected daily xLSTM-TS rerun, causal denoising did not improve directional accuracy over the raw pipeline.
 - **Timeframe Sensitivity**: Predictions of daily trends generally achieved higher accuracy than hourly trends, likely due to the higher volatility in shorter time frames.
 
 ## 🤝 Contributions
